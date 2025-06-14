@@ -4,11 +4,22 @@ const cron = require('node-cron');
 const { client, getQrCodeBase64 } = require('./whatsapp');
 const Message = require('./Models/Message.js');
 const cors = require('cors');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+const port = process.env.PORT;
+const database = process.env.DATABASE_URI;
+console.log(database)
 const app = express();
+
 app.use(express.json());
 app.use(cors());
 // MongoDB
-mongoose.connect('mongodb+srv://teste123:1nqly4SssvbF9GWt@cluster0.51trz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
+mongoose.connect(database, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Conectado ao MongoDB'))
+  .catch((err) => console.error('Erro ao conectar ao MongoDB:', err));
+
 
 // Endpoint para agendar mensagem
 app.post('/schedule', async (req, res) => {
@@ -78,6 +89,6 @@ app.post('/logout', async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-    console.log('Server started on port 3000');
+app.listen(port, () => {
+    console.log(`Server started on port ${port}`);
 });
