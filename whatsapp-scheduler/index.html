@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conectar Dispositivo</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex items-center justify-center">
+
+  <div class="bg-white p-8 rounded shadow-md w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Conectar Dispositivo</h1>
+
+    <label class="block mb-2 font-medium">ID do Dispositivo</label>
+    <input id="deviceId" class="w-full px-4 py-2 border rounded mb-4" placeholder="ex: loja-a" />
+
+    <button onclick="carregarQr()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full">
+      Gerar QR Code
+    </button>
+
+    <div id="status" class="mt-4 text-center text-sm text-gray-500"></div>
+    <canvas id="qrcode" class="mx-auto mt-4"></canvas>
+  </div>
+
+  <script>
+    async function carregarQr() {
+      const deviceId = document.getElementById('deviceId').value.trim();
+      if (!deviceId) return alert('Informe o ID do dispositivo.');
+
+      document.getElementById('status').innerText = 'Buscando QR Code...';
+
+      try {
+        const res = await fetch(`/devices/${deviceId}/qrcode`);
+        const data = await res.json();
+
+        if (data.qr) {
+          QRCode.toCanvas(document.getElementById('qrcode'), data.qr, error => {
+            if (error) console.error(error);
+            document.getElementById('status').innerText = 'Aguardando leitura do QR Code...';
+          });
+
+          // (Opcional) Iniciar verificação de status
+          verificarStatus(deviceId);
+        } else {
+          document.getElementById('status').innerText = 'QR Code não disponível.';
+        }
+      } catch (err) {
+        console.error(err);
+        document.getElementById('status').innerText = 'Erro ao buscar QR Code.';
+      }
+    }
+
+    // Verifica status a cada 5 segundos
+    async function verificarStatus(id) {
+      const statusEl = document.getElementById('status');
+
+      const interval = setInterval(async () => {
+        const res = await fetch(`/devices/${id}/status`);
+        const data = await res.json();
+        if (data.status === 'conectado') {
+          statusEl.innerText = '✅ Dispositivo conectado!';
+          clearInterval(interval);
+        }
+      }, 5000);
+    }
+  </script>
+</body>
+</html>
