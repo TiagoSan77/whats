@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp Sender</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen py-10">
+  <div class="max-w-4xl mx-auto space-y-10 px-4">
+
+    <!-- Seção do QR Code -->
+    <section id="qrSection" class="bg-white p-8 rounded shadow-md space-y-4">
+      <h2 class="text-2xl font-bold text-gray-700 mb-4">Conecte o WhatsApp escaneando o QR Code</h2>
+      <div id="qrContainer" class="flex justify-center">
+        <!-- QR code será inserido aqui -->
+        <p class="text-gray-500">Carregando QR Code...</p>
+      </div>
+      <p id="qrStatus" class="text-center text-sm text-gray-600 mt-2">Escaneie o QR code com o WhatsApp no celular.</p>
+      <!-- Adicione este botão: -->
+  <button id="logoutBtn" class="mt-4 w-full bg-red-600 text-white py-2 rounded">
+    Desconectar WhatsApp
+  </button>
+    </section>
+
+    <!-- Formulário de envio para múltiplos números -->
+    <form id="whatsappForm" class="bg-white p-8 rounded shadow-md space-y-4">
+      <h2 class="text-2xl font-bold text-gray-700 mb-4">Enviar Mensagem no WhatsApp</h2>
+
+      <div>
+        <label for="numbers" class="block text-sm font-medium text-gray-600">
+          Números (um por linha ou separados por vírgula)
+        </label>
+        <textarea id="numbers" name="numbers" rows="4" required
+                  class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Exemplo:&#10;5511999999999&#10;5511888888888 ou 5511999999999,5511888888888"></textarea>
+      </div>
+
+      <div>
+        <label for="message" class="block text-sm font-medium text-gray-600">Mensagem</label>
+        <textarea id="message" name="message" rows="4" required
+                  class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition duration-300">
+        Enviar
+      </button>
+
+      <div id="response" class="text-sm text-green-600 mt-2 hidden"></div>
+    </form>
+
+    <!-- Formulário de agendamento -->
+    <form id="scheduleForm" class="bg-white p-8 rounded shadow-md space-y-4">
+      <h2 class="text-2xl font-bold text-gray-700 mb-4">Agendar Mensagem no WhatsApp</h2>
+
+      <div>
+        <label for="schedule-number" class="block text-sm font-medium text-gray-600">Número</label>
+        <input type="text" id="schedule-number" name="number" required
+              class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+      </div>
+
+      <div>
+        <label for="schedule-message" class="block text-sm font-medium text-gray-600">Mensagem</label>
+        <textarea id="schedule-message" name="message" rows="4" required
+                  class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"></textarea>
+      </div>
+
+      <div>
+        <label for="schedule-date" class="block text-sm font-medium text-gray-600">Data e hora</label>
+        <input type="datetime-local" id="schedule-date" name="date" required
+              class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+      </div>
+
+      <button type="submit"
+              class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-300">
+        Agendar
+      </button>
+
+      <div id="schedule-response" class="text-sm text-green-600 mt-2 hidden"></div>
+    </form>
+  </div>
+
+  <script>
+    // Função para buscar e exibir QR Code
+    async function fetchQrCode() {
+      try {
+        const res = await fetch('http://localhost:3000/qr');
+        if (!res.ok) {
+          document.getElementById('qrContainer').innerHTML = '<p class="text-gray-500">QR code não disponível ou dispositivo já conectado.</p>';
+          document.getElementById('qrStatus').textContent = 'Dispositivo já conectado.';
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('qrContainer').innerHTML = `<img src="${data.qr}" alt="QR Code" class="w-64 h-64" />`;
+        document.getElementById('qrStatus').textContent = 'Escaneie o QR code com o WhatsApp no celular.';
+      } catch (error) {
+        document.getElementById('qrContainer').innerHTML = '<p class="text-red-600">Erro ao carregar QR code.</p>';
+        document.getElementById('qrStatus').textContent = '';
+      }
+    }
+
+    // Atualiza o QR a cada 5 segundos enquanto disponível
+async function startQrPolling() {
+  try {
+    await fetchQrCode();
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch('http://localhost:3000/qr');
+        if (!res.ok) {
+          clearInterval(intervalId);
+          document.getElementById('qrContainer').innerHTML = 
+            '<p class="text-green-600 font-semibold">WhatsApp conectado!</p>';
+          document.getElementById('qrStatus').textContent = '';
+        } else {
+          const data = await res.json();
+          document.getElementById('qrContainer').innerHTML = 
+            `<img src="${data.qr}" alt="QR Code" class="w-64 h-64" />`;
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 5000);
+  } catch (error) {
+    console.error("Initial fetch error:", error);
+  }
+}
+
+    // Inicia o polling do QR code ao carregar a página
+    startQrPolling();
+
+    // Envio para múltiplos números
+    document.getElementById('whatsappForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const numbersRaw = document.getElementById('numbers').value;
+      const message = document.getElementById('message').value;
+      const responseEl = document.getElementById('response');
+
+      const numbers = numbersRaw
+        .split(/[\n,]+/)
+        .map(num => num.trim())
+        .filter(num => num);
+
+      if (numbers.length === 0) {
+        responseEl.textContent = 'Informe pelo menos um número.';
+        responseEl.classList.remove('hidden');
+        responseEl.classList.add('text-red-600');
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/send-now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numbers, message })
+        });
+
+        const data = await res.json();
+        responseEl.textContent = `Enviados: ${data.enviados} | Falhas: ${data.falhas.length}`;
+        responseEl.classList.remove('hidden');
+        responseEl.classList.remove('text-red-600');
+      } catch (error) {
+        responseEl.textContent = 'Erro ao enviar mensagens.';
+        responseEl.classList.remove('hidden');
+        responseEl.classList.add('text-red-600');
+      }
+    });
+
+    // Agendamento de mensagem
+    document.getElementById('scheduleForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const number = document.getElementById('schedule-number').value;
+      const message = document.getElementById('schedule-message').value;
+      const date = document.getElementById('schedule-date').value;
+      const responseEl = document.getElementById('schedule-response');
+
+      try {
+        const res = await fetch('http://localhost:3000/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            number,
+            message,
+            date: new Date(date).toISOString()
+          })
+        });
+
+        const data = await res.json();
+        responseEl.textContent = data.status || 'Mensagem agendada com sucesso!';
+        responseEl.classList.remove('hidden');
+        responseEl.classList.remove('text-red-600');
+      } catch (error) {
+        responseEl.textContent = 'Erro ao agendar mensagem.';
+        responseEl.classList.remove('hidden');
+        responseEl.classList.add('text-red-600');
+      }
+    });
+
+    //destroi a sessão:
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+  try {
+    const res = await fetch('http://localhost:3000/logout', { method: 'POST' });
+    const data = await res.json();
+    alert(data.message || 'Desconectado com sucesso!');
+    // Aqui você pode, por exemplo, recarregar a página para mostrar o QR novamente
+    window.location.reload();
+  } catch (error) {
+    alert('Erro ao desconectar dispositivo.');
+  }
+});
+
+  </script>
+</body>
+</html>

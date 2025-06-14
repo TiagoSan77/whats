@@ -1,12 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
-const client = require('./whatsapp');
+const { client, getQrCodeBase64 } = require('./whatsapp');
 const Message = require('./Models/Message.js');
-
+const cors = require('cors');
 const app = express();
 app.use(express.json());
-
+app.use(cors());
 // MongoDB
 mongoose.connect('mongodb+srv://teste123:1nqly4SssvbF9GWt@cluster0.51trz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0');
 
@@ -31,21 +31,52 @@ cron.schedule('* * * * *', async () => {
 });
 
 app.post('/send-now', async (req, res) => {
-    const { number, message } = req.body;
+    const { numbers, message } = req.body;
 
-    if (!number || !message) {
-        return res.status(400).send({ error: 'Número e mensagem são obrigatórios.' });
+    if (!Array.isArray(numbers) || numbers.length === 0 || !message) {
+        return res.status(400).send({ error: 'É necessário fornecer um array de números e uma mensagem.' });
     }
 
-    try {
-        await client.sendMessage(`${number}@c.us`, message);
-        res.send({ success: true, message: 'Mensagem enviada com sucesso.' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ success: false, error: 'Erro ao enviar a mensagem.' });
+    const results = [];
+
+    for (const number of numbers) {
+        try {
+            await client.sendMessage(`${number}@c.us`, message);
+            results.push({ number, success: true });
+        } catch (err) {
+            console.error(`Erro ao enviar para ${number}:`, err);
+            results.push({ number, success: false, error: 'Erro ao enviar a mensagem.' });
+        }
+    }
+
+    res.send({
+        success: true,
+        total: results.length,
+        enviados: results.filter(r => r.success).length,
+        falhas: results.filter(r => !r.success),
+        detalhes: results
+    });
+});
+
+
+app.get('/qr', (req, res) => {
+      const qr = getQrCodeBase64();
+    if (qr) {
+        return res.json({ qr }); // envia base64 do QR
+    } else {
+        return res.status(404).json({ error: 'QR Code não disponível ou já autenticado.' });
     }
 });
 
+app.post('/logout', async (req, res) => {
+  try {
+    await client.destroy();  // desconecta e limpa sessão
+    res.send({ success: true, message: 'Dispositivo desconectado.' });
+  } catch (error) {
+    console.error('Erro ao desconectar:', error);
+    res.status(500).send({ success: false, error: 'Erro ao desconectar o dispositivo.' });
+  }
+});
 
 app.listen(3000, () => {
     console.log('Server started on port 3000');
